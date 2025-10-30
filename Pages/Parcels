@@ -263,3 +263,64 @@ export default function Parcels() {
     </div>
   );
 }
+
+
+import React, { useState } from 'react'
+import { api } from '../components/SupabaseHelper'
+
+export default function Parcels() {
+  const [geohash, setGeohash] = useState('cdmx_cell_001')
+  const [prefix, setPrefix] = useState('cdmx_')
+  const [list, setList] = useState([])
+
+  async function claim() {
+    try {
+      const pid = await api('/rest/v1/rpc/claim_parcel', { method: 'POST', body: { p_geohash: geohash } })
+      alert('Parcela reclamada: ' + pid)
+    } catch (e) {
+      if (String(e.message).includes('PARCEL_CONTESTED')) {
+        alert('Parcela disputada (influencia alta). Elige otra geohash.')
+      } else {
+        alert('Error: ' + e.message)
+      }
+    }
+  }
+
+  async function doList() {
+    const rows = await api('/rest/v1/rpc/list_parcels_by_geohash_prefix', {
+      method: 'POST',
+      body: { p_prefix: prefix, p_limit: 50, p_offset: 0 }
+    })
+    setList(rows || [])
+  }
+
+  return (
+    <div style={{ maxWidth: 720, margin: '20px auto' }}>
+      <h1>Parcelas</h1>
+
+      <div style={{ padding: 12, background:'#f3f3f3', borderRadius:8 }}>
+        <div>
+          <label>Geohash a reclamar</label><br/>
+          <input value={geohash} onChange={e=>setGeohash(e.target.value)} />
+          <button onClick={claim} style={{ marginLeft: 8 }}>Reclamar</button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16, padding: 12, background:'#f3f3f3', borderRadius:8 }}>
+        <div>
+          <label>Prefijo para listar</label><br/>
+          <input value={prefix} onChange={e=>setPrefix(e.target.value)} />
+          <button onClick={doList} style={{ marginLeft: 8 }}>Listar</button>
+        </div>
+
+        <ul style={{ marginTop: 12 }}>
+          {list.map(p => (
+            <li key={p.id}>
+              {p.geohash} — owner_user_id {p.owner_user_id || '—'} — inf {p.influence}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
