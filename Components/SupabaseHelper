@@ -1,0 +1,99 @@
+/**
+ * Helper para hacer llamadas REST a Supabase
+ * Agrega automáticamente headers de autenticación
+ */
+export async function api(path, { method = 'GET', body } = {}) {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}${path}`;
+  const token = localStorage.getItem('sb_access_token');
+  
+  const headers = {
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const options = {
+    method,
+    headers,
+  };
+  
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+  
+  const res = await fetch(url, options);
+  const text = await res.text();
+  
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  
+  if (!res.ok) {
+    const errorMsg = data?.message || data?.msg || data?.error || data || res.statusText;
+    throw new Error(errorMsg);
+  }
+  
+  return data;
+}
+
+/**
+ * Verifica si el usuario está autenticado
+ */
+export function isAuthenticated() {
+  return !!localStorage.getItem('sb_access_token');
+}
+
+/**
+ * Obtiene el user_id del localStorage
+ */
+export function getUserId() {
+  return localStorage.getItem('sb_user_id');
+}
+
+/**
+ * Cierra sesión limpiando el localStorage
+ */
+export function logout() {
+  localStorage.removeItem('sb_access_token');
+  localStorage.removeItem('sb_user_id');
+}
+
+/**
+ * Mapea códigos de error del backend a mensajes en español
+ */
+export function getErrorMessage(error) {
+  const errorStr = error.toString().toUpperCase();
+  
+  if (errorStr.includes('AD_LIMIT')) {
+    return '🏴‍☠️ ¡Límite diario alcanzado! Vuelve mañana, marinero.';
+  }
+  if (errorStr.includes('UNAUTHENTICATED')) {
+    return '⚠️ Sesión expirada. Inicia sesión de nuevo.';
+  }
+  if (errorStr.includes('NOT_CAPTAIN')) {
+    return '🚫 Solo el capitán puede hacer esto.';
+  }
+  if (errorStr.includes('TAX_RANGE')) {
+    return '📊 El impuesto debe estar entre 0% y 50%.';
+  }
+  if (errorStr.includes('POOL_TOO_SMALL')) {
+    return '💰 No hay oro suficiente en el cofre del clan.';
+  }
+  if (errorStr.includes('PARCEL_CONTESTED')) {
+    return '⚔️ Parcela disputada (influencia demasiado alta).';
+  }
+  if (errorStr.includes('ALREADY_IN_CREW')) {
+    return '🏴 Ya perteneces a un crew. Sal primero.';
+  }
+  if (errorStr.includes('NOT_IN_CREW')) {
+    return '🏴 No perteneces a ningún crew.';
+  }
+  
+  return `❌ ${error.message || error}`;
+}
