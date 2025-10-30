@@ -1,0 +1,473 @@
+import React, { useState, useEffect } from 'react';
+import { api, getUserId, getErrorMessage } from '../components/SupabaseHelper';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Flag, Users, TrendingUp, DollarSign, LogOut, AlertCircle, CheckCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export default function Crew() {
+  const [activeTab, setActiveTab] = useState('status');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  // Create crew
+  const [crewName, setCrewName] = useState('');
+  const [taxRate, setTaxRate] = useState(20);
+  
+  // Join crew
+  const [joinCrewId, setJoinCrewId] = useState('');
+  
+  // Current crew info
+  const [myCrew, setMyCrew] = useState(null);
+  const [myRole, setMyRole] = useState(null);
+  const [lootPool, setLootPool] = useState(null);
+  
+  // Update tax
+  const [newTaxRate, setNewTaxRate] = useState(20);
+  
+  // Distribute loot
+  const [lootBreakdown, setLootBreakdown] = useState('');
+
+  const userId = getUserId();
+
+  const fetchCrewInfo = async () => {
+    try {
+      setLoading(true);
+      
+      // Get my crew membership
+      const memberships = await api(`/rest/v1/crew_members?user_id=eq.${userId}&select=crew_id,role`);
+      
+      if (memberships && memberships.length > 0) {
+        const membership = memberships[0];
+        setMyRole(membership.role);
+        
+        // Get crew details
+        const crews = await api(`/rest/v1/crews?id=eq.${membership.crew_id}&select=*`);
+        if (crews && crews.length > 0) {
+          setMyCrew(crews[0]);
+          
+          // Get loot pool
+          const pools = await api(`/rest/v1/loot_pools?crew_id=eq.${membership.crew_id}&select=gold_amount`);
+          if (pools && pools.length > 0) {
+            setLootPool(pools[0]);
+          }
+        }
+      } else {
+        setMyCrew(null);
+        setMyRole(null);
+        setLootPool(null);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCrewInfo();
+  }, []);
+
+  const handleCreateCrew = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      const result = await api('/rest/v1/rpc/create_crew', {
+        method: 'POST',
+        body: {
+          p_name: crewName,
+          p_tax_rate: taxRate
+        }
+      });
+
+      setSuccess(`🏴 ¡Crew "${crewName}" creado con éxito!`);
+      setCrewName('');
+      setTimeout(() => {
+        fetchCrewInfo();
+        setSuccess('');
+      }, 2000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleJoinCrew = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      await api('/rest/v1/rpc/join_crew', {
+        method: 'POST',
+        body: { p_crew_id: joinCrewId }
+      });
+
+      setSuccess('⚓ ¡Te has unido al crew!');
+      setJoinCrewId('');
+      setTimeout(() => {
+        fetchCrewInfo();
+        setSuccess('');
+      }, 2000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleLeaveCrew = async () => {
+    setError('');
+    setSuccess('');
+
+    try {
+      await api('/rest/v1/rpc/leave_crew', {
+        method: 'POST',
+        body: {}
+      });
+
+      setSuccess('👋 Has abandonado el crew.');
+      setTimeout(() => {
+        fetchCrewInfo();
+        setSuccess('');
+      }, 2000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleUpdateTax = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      await api('/rest/v1/rpc/update_crew_tax', {
+        method: 'POST',
+        body: {
+          p_crew_id: myCrew.id,
+          p_tax_rate: newTaxRate
+        }
+      });
+
+      setSuccess(`📊 Impuesto actualizado a ${newTaxRate}%`);
+      setTimeout(() => {
+        fetchCrewInfo();
+        setSuccess('');
+      }, 2000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleDistributeLoot = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      const breakdown = JSON.parse(lootBreakdown);
+
+      await api('/rest/v1/rpc/distribute_loot', {
+        method: 'POST',
+        body: {
+          p_crew_id: myCrew.id,
+          p_breakdown: breakdown
+        }
+      });
+
+      setSuccess('💰 ¡Botín repartido con éxito!');
+      setLootBreakdown('');
+      setTimeout(() => {
+        fetchCrewInfo();
+        setSuccess('');
+      }, 2000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-4xl font-bold text-amber-400">Gestión de Crews</h1>
+        <p className="text-slate-300">Crea, únete o gestiona tu tripulación</p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive" className="bg-red-900/50 border-red-500/50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="bg-green-900/50 border-green-500/50">
+          <CheckCircle className="h-4 w-4 text-green-400" />
+          <AlertDescription className="text-green-300">{success}</AlertDescription>
+        </Alert>
+      )}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3 bg-slate-800">
+          <TabsTrigger value="status">Mi Crew</TabsTrigger>
+          <TabsTrigger value="join">Unirse/Crear</TabsTrigger>
+          <TabsTrigger value="manage">Gestionar</TabsTrigger>
+        </TabsList>
+
+        {/* Status Tab */}
+        <TabsContent value="status" className="space-y-4">
+          {loading ? (
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardContent className="p-6">
+                <Skeleton className="h-32 w-full bg-slate-700" />
+              </CardContent>
+            </Card>
+          ) : myCrew ? (
+            <>
+              <Card className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 border-purple-600/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-300">
+                    <Flag className="w-6 h-6" />
+                    {myCrew.name}
+                  </CardTitle>
+                  <CardDescription className="text-slate-300">
+                    Tu tripulación actual
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-slate-400">Tu Rol</p>
+                      <p className="text-2xl font-bold text-purple-300 capitalize">{myRole}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-400">Impuesto</p>
+                      <p className="text-2xl font-bold text-amber-300">{myCrew.tax_rate}%</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-400">Reputación</p>
+                      <p className="text-2xl font-bold text-blue-300">{myCrew.reputation}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-400">Cofre Común</p>
+                      <p className="text-2xl font-bold text-green-300">{lootPool?.gold_amount || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-700">
+                    <p className="text-xs text-slate-500 mb-2">Crew ID</p>
+                    <p className="text-sm font-mono text-slate-400 break-all">{myCrew.id}</p>
+                  </div>
+
+                  <Button
+                    onClick={handleLeaveCrew}
+                    variant="outline"
+                    className="w-full border-red-500/50 text-red-400 hover:bg-red-900/20"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Abandonar Crew
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardContent className="p-12 text-center">
+                <Users className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p className="text-xl text-slate-400 mb-2">Sin viento en las velas</p>
+                <p className="text-slate-500">No perteneces a ningún crew todavía.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Join/Create Tab */}
+        <TabsContent value="join" className="space-y-4">
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-amber-400">Crear Nuevo Crew</CardTitle>
+              <CardDescription className="text-slate-300">
+                Conviértete en capitán de tu propia tripulación
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateCrew} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-300">Nombre del Crew</label>
+                  <Input
+                    value={crewName}
+                    onChange={(e) => setCrewName(e.target.value)}
+                    placeholder="Tiburones Negros"
+                    required
+                    className="bg-slate-700/50 border-slate-600 text-white mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-300">
+                    Impuesto (0-50%)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={taxRate}
+                    onChange={(e) => setTaxRate(parseInt(e.target.value))}
+                    required
+                    className="bg-slate-700/50 border-slate-600 text-white mt-1"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    % del oro de los miembros que va al cofre común
+                  </p>
+                </div>
+
+                <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">
+                  <Flag className="w-4 h-4 mr-2" />
+                  Crear Crew
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-blue-400">Unirse a un Crew</CardTitle>
+              <CardDescription className="text-slate-300">
+                Necesitas el ID del crew para unirte
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleJoinCrew} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-300">Crew ID (UUID)</label>
+                  <Input
+                    value={joinCrewId}
+                    onChange={(e) => setJoinCrewId(e.target.value)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    required
+                    className="bg-slate-700/50 border-slate-600 text-white mt-1 font-mono text-sm"
+                  />
+                </div>
+
+                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+                  <Users className="w-4 h-4 mr-2" />
+                  Unirse
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Manage Tab */}
+        <TabsContent value="manage" className="space-y-4">
+          {!myCrew ? (
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardContent className="p-12 text-center">
+                <p className="text-slate-400">Debes pertenecer a un crew para gestionar.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {myRole === 'captain' && (
+                <>
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardHeader>
+                      <CardTitle className="text-amber-400 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5" />
+                        Actualizar Impuesto
+                      </CardTitle>
+                      <CardDescription className="text-slate-300">
+                        Solo el capitán puede modificar el tax rate
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleUpdateTax} className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium text-slate-300">
+                            Nuevo Impuesto (0-50%)
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={newTaxRate}
+                            onChange={(e) => setNewTaxRate(parseInt(e.target.value))}
+                            required
+                            className="bg-slate-700/50 border-slate-600 text-white mt-1"
+                          />
+                        </div>
+
+                        <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700">
+                          Actualizar Impuesto
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-slate-800/50 border-slate-700">
+                    <CardHeader>
+                      <CardTitle className="text-green-400 flex items-center gap-2">
+                        <DollarSign className="w-5 h-5" />
+                        Repartir Botín
+                      </CardTitle>
+                      <CardDescription className="text-slate-300">
+                        Distribuye oro del cofre a los miembros
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleDistributeLoot} className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium text-slate-300">
+                            Oro disponible en cofre
+                          </label>
+                          <div className="text-2xl font-bold text-green-300 mt-1">
+                            {lootPool?.gold_amount || 0} oro
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium text-slate-300">
+                            Breakdown (JSON)
+                          </label>
+                          <Textarea
+                            value={lootBreakdown}
+                            onChange={(e) => setLootBreakdown(e.target.value)}
+                            placeholder='{"user-uuid-1": 100, "user-uuid-2": 150}'
+                            rows={4}
+                            required
+                            className="bg-slate-700/50 border-slate-600 text-white mt-1 font-mono text-sm"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            Formato: {`{"user_id": cantidad_oro, ...}`}
+                          </p>
+                        </div>
+
+                        <Button type="submit" className="w-full bg-green-600 hover:bg-green-700">
+                          <DollarSign className="w-4 h-4 mr-2" />
+                          Repartir Botín
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {myRole !== 'captain' && (
+                <Card className="bg-slate-800/50 border-slate-700">
+                  <CardContent className="p-12 text-center">
+                    <p className="text-slate-400">Solo el capitán puede gestionar el crew.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
