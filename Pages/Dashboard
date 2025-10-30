@@ -178,3 +178,74 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+import React, { useEffect, useState } from 'react'
+import { api } from '../components/SupabaseHelper'
+
+export default function Dashboard() {
+  const [wallet, setWallet] = useState(null)
+  const [parcels, setParcels] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  async function fetchAll() {
+    const me = await api('/auth/v2/user')
+    const uid = me?.user?.id
+    if (!uid) throw new Error('No autenticado')
+
+    const rows = await api(`/rest/v1/wallets?user_id=eq.${uid}&select=gold,daily_ad_count`)
+    setWallet(rows?.[0] || { gold: 0, daily_ad_count: 0 })
+
+    const mine = await api(`/rest/v1/parcels?owner_user_id=eq.${uid}&select=geohash,influence,base_yield_per_hour,last_activity_at&id=not.is.null&order=last_activity_at.desc`)
+    setParcels(mine || [])
+  }
+
+  async function handleAd() {
+    try {
+      const res = await api('/rest/v1/rpc/record_ad_view', { method: 'POST', body: {} })
+      alert(`+${res} de oro por anuncio`)
+      await fetchAll()
+    } catch (e) {
+      if (String(e.message).includes('AD_LIMIT')) {
+        alert('Límite diario alcanzado')
+      } else {
+        alert('Error: ' + e.message)
+      }
+    }
+  }
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true)
+      try { await fetchAll() } finally { setLoading(false) }
+    })()
+  }, [])
+
+  if (loading) return <div style={{ padding: 20 }}>Cargando…</div>
+
+  return (
+    <div style={{ maxWidth: 720, margin: '20px auto' }}>
+      <h1>Tablero Pirata</h1>
+      <section style={{ padding: 12, background: '#f3f3f3', borderRadius: 8 }}>
+        <div><b>Oro:</b> {wallet?.gold ?? 0}</div>
+        <div><b>Anuncios hoy:</b> {wallet?.daily_ad_count ?? 0} / 20</div>
+        <button onClick={handleAd} style={{ marginTop: 8 }}>Ver anuncio (+100 oro)</button>
+      </section>
+
+      <section style={{ marginTop: 16 }}>
+        <h2>Mis parcelas</h2>
+        {parcels.length === 0 ? (
+          <div>Sin parcelas aún.</div>
+        ) : (
+          <ul>
+            {parcels.map((p, i) => (
+              <li key={i}>
+                {p.geohash} — inf {p.influence} — {p.base_yield_per_hour}/h — {new Date(p.last_activity_at).toLocaleString()}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
