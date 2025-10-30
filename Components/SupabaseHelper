@@ -97,3 +97,14 @@ export function getErrorMessage(error) {
   
   return `❌ ${error.message || error}`;
 }
+
+
+export {
+  api,
+  setSession,
+  clearSession,
+  getToken,
+  getUserId,
+  getErrorMessage
+} from '../lib/supaApi'
+
