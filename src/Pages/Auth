@@ -1,3 +1,4 @@
+// src/Pages/Auth.jsx
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setSession, getErrorMessage } from '../components/SupabaseHelper'
@@ -17,6 +18,7 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
+        // Registro y login inmediato
         await api('/auth/v1/signup', { method: 'POST', body: { email, password } })
         const loginData = await api('/auth/v1/token?grant_type=password', {
           method: 'POST', body: { email, password }
@@ -24,6 +26,7 @@ export default function Auth() {
         setSession(loginData)
         navigate('/Dashboard')
       } else {
+        // Login
         const data = await api('/auth/v1/token?grant_type=password', {
           method: 'POST', body: { email, password }
         })
