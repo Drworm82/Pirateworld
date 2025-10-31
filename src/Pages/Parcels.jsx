@@ -1,326 +1,80 @@
-import React, { useState } from 'react';
-import { api, getErrorMessage } from '../components/SupabaseHelper';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Map, Flag, Search, AlertCircle, CheckCircle, Sword } from 'lucide-react';
-
-export default function Parcels() {
-  const [claimGeohash, setClaimGeohash] = useState('');
-  const [searchPrefix, setSearchPrefix] = useState('');
-  const [parcels, setParcels] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const handleClaimParcel = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
-
-    try {
-      await api('/rest/v1/rpc/claim_parcel', {
-        method: 'POST',
-        body: { p_geohash: claimGeohash }
-      });
-
-      setSuccess(`⚓ ¡Parcela ${claimGeohash} reclamada!`);
-      setClaimGeohash('');
-      
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearchParcels = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
-
-    try {
-      const result = await api('/rest/v1/rpc/list_parcels_by_geohash_prefix', {
-        method: 'POST',
-        body: {
-          p_prefix: searchPrefix,
-          p_limit: 50,
-          p_offset: 0
-        }
-      });
-
-      setParcels(result || []);
-      
-      if (!result || result.length === 0) {
-        setSuccess('🏝️ No se encontraron parcelas con ese prefijo.');
-      }
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getRarityColor = (rarity) => {
-    const colors = {
-      common: 'bg-gray-100 text-gray-800 border-gray-300',
-      uncommon: 'bg-green-100 text-green-800 border-green-300',
-      rare: 'bg-blue-100 text-blue-800 border-blue-300',
-      legendary: 'bg-purple-100 text-purple-800 border-purple-300',
-    };
-    return colors[rarity] || colors.common;
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold text-amber-400">Mapa de Parcelas</h1>
-        <p className="text-slate-300">Reclama territorio y expande tu imperio</p>
-      </div>
-
-      {error && (
-        <Alert variant="destructive" className="bg-red-900/50 border-red-500/50">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {success && (
-        <Alert className="bg-green-900/50 border-green-500/50">
-          <CheckCircle className="h-4 w-4 text-green-400" />
-          <AlertDescription className="text-green-300">{success}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Claim Parcel */}
-        <Card className="bg-gradient-to-br from-red-900/40 to-red-800/20 border-red-600/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-300">
-              <Sword className="w-6 h-6" />
-              Reclamar Parcela
-            </CardTitle>
-            <CardDescription className="text-slate-300">
-              Ingresa el geohash de la parcela que deseas conquistar
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleClaimParcel} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-300">Geohash</label>
-                <Input
-                  value={claimGeohash}
-                  onChange={(e) => setClaimGeohash(e.target.value)}
-                  placeholder="cdmx_cell_001"
-                  required
-                  className="bg-slate-700/50 border-slate-600 text-white mt-1"
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Ejemplo: cdmx_cell_001, mx_zona_42, etc.
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-red-600 hover:bg-red-700"
-              >
-                <Flag className="w-4 h-4 mr-2" />
-                {loading ? 'Reclamando...' : 'Reclamar Territorio'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Search Parcels */}
-        <Card className="bg-gradient-to-br from-blue-900/40 to-blue-800/20 border-blue-600/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-300">
-              <Search className="w-6 h-6" />
-              Explorar Región
-            </CardTitle>
-            <CardDescription className="text-slate-300">
-              Busca parcelas por prefijo de geohash
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSearchParcels} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-slate-300">Prefijo</label>
-                <Input
-                  value={searchPrefix}
-                  onChange={(e) => setSearchPrefix(e.target.value)}
-                  placeholder="cdmx_"
-                  required
-                  className="bg-slate-700/50 border-slate-600 text-white mt-1"
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Busca todas las parcelas que empiecen con este prefijo
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                <Map className="w-4 h-4 mr-2" />
-                {loading ? 'Buscando...' : 'Buscar Parcelas'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Results Table */}
-      {parcels.length > 0 && (
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-amber-400">
-              Parcelas Encontradas ({parcels.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-slate-700">
-                  <TableHead className="text-slate-300">Geohash</TableHead>
-                  <TableHead className="text-slate-300">Rareza</TableHead>
-                  <TableHead className="text-slate-300">Oro/hora</TableHead>
-                  <TableHead className="text-slate-300">Influencia</TableHead>
-                  <TableHead className="text-slate-300">Dueño</TableHead>
-                  <TableHead className="text-slate-300">Última Actividad</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {parcels.map((parcel) => (
-                  <TableRow key={parcel.id} className="border-slate-700">
-                    <TableCell className="font-mono text-sm text-slate-300">
-                      {parcel.geohash}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${getRarityColor(parcel.rarity)} border`}>
-                        {parcel.rarity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-amber-400 font-semibold">
-                      {parcel.base_yield_per_hour}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-slate-700 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full"
-                            style={{ width: `${parcel.influence}%` }}
-                          />
-                        </div>
-                        <span className="text-sm text-slate-400">{parcel.influence}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-400">
-                      {parcel.owner_user_id ? (
-                        <span className="text-green-400">
-                          {parcel.owner_user_id.substring(0, 8)}...
-                        </span>
-                      ) : parcel.owner_crew_id ? (
-                        <span className="text-purple-400">
-                          Crew: {parcel.owner_crew_id.substring(0, 8)}...
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">Libre</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-400">
-                      {parcel.last_activity_at
-                        ? new Date(parcel.last_activity_at).toLocaleDateString('es-ES')
-                        : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {parcels.length === 0 && searchPrefix && !loading && (
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardContent className="p-12 text-center">
-            <Map className="w-16 h-16 mx-auto mb-4 text-slate-600" />
-            <p className="text-xl text-slate-400">Aguas desconocidas</p>
-            <p className="text-slate-500 mt-2">
-              Busca parcelas usando el formulario de arriba
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-
+// src/Pages/Parcels.jsx
 import React, { useState } from 'react'
 import { api } from '../components/SupabaseHelper'
 
 export default function Parcels() {
-  const [geohash, setGeohash] = useState('cdmx_cell_001')
-  const [prefix, setPrefix] = useState('cdmx_')
+  const [prefix, setPrefix] = useState('')
   const [list, setList] = useState([])
+  const [message, setMessage] = useState('')
 
-  async function claim() {
+  const handleClaim = async () => {
+    setMessage('Reclamando...')
     try {
-      const pid = await api('/rest/v1/rpc/claim_parcel', { method: 'POST', body: { p_geohash: geohash } })
-      alert('Parcela reclamada: ' + pid)
-    } catch (e) {
-      if (String(e.message).includes('PARCEL_CONTESTED')) {
-        alert('Parcela disputada (influencia alta). Elige otra geohash.')
-      } else {
-        alert('Error: ' + e.message)
-      }
+      await api(`/rest/v1/rpc/claim_parcel`, {
+        method: 'POST',
+        body: { p_geohash: prefix }
+      })
+      setMessage('Parcela reclamada con éxito')
+    } catch (err) {
+      setMessage('Error: ' + err.message)
     }
   }
 
-  async function doList() {
-    const rows = await api('/rest/v1/rpc/list_parcels_by_geohash_prefix', {
-      method: 'POST',
-      body: { p_prefix: prefix, p_limit: 50, p_offset: 0 }
-    })
-    setList(rows || [])
+  const handleList = async () => {
+    setMessage('Listando...')
+    try {
+      const data = await api(`/rest/v1/rpc/list_parcels_by_geohash_prefix`, {
+        method: 'POST',
+        body: { p_prefix: prefix, p_limit: 50 }
+      })
+      setList(data)
+      setMessage('')
+    } catch (err) {
+      setMessage('Error: ' + err.message)
+    }
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '20px auto' }}>
-      <h1>Parcelas</h1>
+    <div style={{ padding: 20 }}>
+      <h2>Parcelas (islas)</h2>
+      <p>Ingresa un prefijo (por ejemplo: <code>cdmx_</code>)</p>
+      <input
+        value={prefix}
+        onChange={(e) => setPrefix(e.target.value)}
+        placeholder="Prefijo de geohash"
+        style={{ padding: 8, width: '100%', maxWidth: 300 }}
+      />
 
-      <div style={{ padding: 12, background:'#f3f3f3', borderRadius:8 }}>
-        <div>
-          <label>Geohash a reclamar</label><br/>
-          <input value={geohash} onChange={e=>setGeohash(e.target.value)} />
-          <button onClick={claim} style={{ marginLeft: 8 }}>Reclamar</button>
-        </div>
+      <div style={{ marginTop: 10 }}>
+        <button
+          onClick={handleClaim}
+          style={{ marginRight: 10, padding: 8 }}
+        >
+          Reclamar parcela
+        </button>
+        <button onClick={handleList} style={{ padding: 8 }}>
+          Listar parcelas
+        </button>
       </div>
 
-      <div style={{ marginTop: 16, padding: 12, background:'#f3f3f3', borderRadius:8 }}>
-        <div>
-          <label>Prefijo para listar</label><br/>
-          <input value={prefix} onChange={e=>setPrefix(e.target.value)} />
-          <button onClick={doList} style={{ marginLeft: 8 }}>Listar</button>
-        </div>
+      {message && (
+        <p style={{ marginTop: 10, color: message.startsWith('Error') ? 'red' : 'green' }}>
+          {message}
+        </p>
+      )}
 
-        <ul style={{ marginTop: 12 }}>
-          {list.map(p => (
-            <li key={p.id}>
-              {p.geohash} — owner_user_id {p.owner_user_id || '—'} — inf {p.influence}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {list.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3>Resultados:</h3>
+          <ul>
+            {list.map((p) => (
+              <li key={p.id}>
+                {p.geohash} – {p.rarity} – {p.influence}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
